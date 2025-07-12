@@ -1,0 +1,70 @@
+#include <NewPing.h>
+#include <AFMotor.h>
+
+#define TRIG_PIN 9
+#define ECHO_PIN 10
+#define MAX_DISTANCE 100
+
+NewPing sonar(TRIG_PIN, ECHO_PIN, MAX_DISTANCE);
+
+AF_DCMotor motorLeft(1);
+AF_DCMotor motorRight(2);
+
+// Timing variables
+unsigned long previousMillis = 0;
+const long loopInterval = 50;
+
+unsigned long reactionStartTime = 0;
+bool reacting = false;
+
+void setup() {
+  Serial.begin(9600);
+  motorLeft.setSpeed(200);
+  motorRight.setSpeed(200);
+}
+
+void loop() {
+  unsigned long currentMillis = millis();
+
+  // Run this block every loopInterval milliseconds
+  if (currentMillis - previousMillis >= loopInterval && !reacting) {
+    previousMillis = currentMillis;
+
+    int distance = sonar.ping_cm();
+    Serial.print("Distance: ");
+    Serial.println(distance);
+
+    if (distance == 0) {
+      // Failsafe if sensor fails to read
+      motorLeft.run(RELEASE);
+      motorRight.run(RELEASE);
+      return;
+    }
+
+    if (distance > 0 && distance < 15) {
+      // Begin reaction
+      reacting = true;
+      reactionStartTime = currentMillis;
+      
+      motorLeft.run(BACKWARD);
+      motorRight.run(BACKWARD);
+    } else {
+      motorLeft.run(FORWARD);
+      motorRight.run(FORWARD);
+    }
+  }
+
+  // Handle reaction timing
+  if (reacting) {
+    unsigned long elapsed = currentMillis - reactionStartTime;
+
+    if (elapsed > 100 && elapsed <= 250) {
+      // After reversing, initiate turn
+      motorLeft.run(FORWARD);
+      motorRight.run(BACKWARD);
+    } else if (elapsed > 250) {
+      // End reaction phase
+      reacting = false;
+    }
+  }
+}
